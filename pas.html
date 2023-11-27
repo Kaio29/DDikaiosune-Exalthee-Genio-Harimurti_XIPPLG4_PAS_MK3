@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    canvas {
+      border: 1px solid #000;
+    }
+
+    #game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #startBtn,
+    #restartBtn {
+      margin: 10px;
+      padding: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+  <title>Dodge Game</title>
+</head>
+<body>
+  <div id="game-container">
+    <h1 id="game-title">Dodge Game</h1>
+    <canvas id="shooterCanvas" width="400" height="300"></canvas>
+    <button id="startBtn" onclick="startGame()">Start Game</button>
+    <button id="restartBtn" onclick="restartGame()" style="display: none;">Restart Game</button>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("shooterCanvas");
+    const ctx = canvas.getContext("2d");
+    let gameInterval;
+    let player;
+    let bullets = [];
+    let enemies = [];
+    let bulletExplosions = [];
+
+    function startGame() {
+      document.getElementById("startBtn").style.display = "none";
+      document.getElementById("restartBtn").style.display = "inline";
+      document.getElementById("game-title").innerText = "Dodge Game - Playing";
+
+      player = new Player(); // Inisialisasi player di sini
+      enemies = [];
+      bullets = [];
+      bulletExplosions = [];
+
+      gameInterval = setInterval(updateGame, 20);
+    }
+
+    function restartGame() {
+      clearInterval(gameInterval);
+      document.getElementById("startBtn").style.display = "inline";
+      document.getElementById("restartBtn").style.display = "none";
+      document.getElementById("game-title").innerText = "Dodge Game";
+
+      player = null;
+      enemies = [];
+      bullets = [];
+      bulletExplosions = [];
+    }
+
+    function updateGame() {
+      clearCanvas();
+      player.update();
+      player.draw();
+      updateBullets();
+      updateBulletExplosions();
+      updateEnemies();
+      checkCollisions();
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function Player() {
+      this.width = 30;
+      this.height = 30;
+      this.x = canvas.width / 2 - this.width / 2;
+      this.y = canvas.height - this.height - 10;
+
+      this.update = function () {
+        // Update player logic
+      };
+
+      this.draw = function () {
+        ctx.fillStyle = "blue";
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+      };
+    }
+
+    function Bullet(x, y) {
+      this.width = 5;
+      this.height = 15;
+      this.x = x;
+      this.y = y;
+
+      this.update = function () {
+        this.y -= 5; // Bullet speed
+      };
+
+      this.draw = function () {
+        ctx.fillStyle = "red";
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+      };
+    }
+
+    function BulletExplosion(x, y) {
+      this.x = x;
+      this.y = y;
+      this.frame = 0;
+
+      this.update = function () {
+        this.frame++;
+        if (this.frame > 5) {
+          bulletExplosions.splice(bulletExplosions.indexOf(this), 1);
+        }
+      };
+
+      this.draw = function () {
+        // Draw explosion animation for bullets
+        ctx.fillStyle = "orange";
+        ctx.fillRect(this.x - 5, this.y - 5, 20, 20);
+      };
+    }
+
+    function Enemy() {
+      this.width = 30;
+      this.height = 30;
+      this.x = Math.random() * (canvas.width - this.width);
+      this.y = 0;
+
+      this.update = function () {
+        this.y += 3; // Enemy speed
+      };
+
+      this.draw = function () {
+        ctx.fillStyle = "purple";
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+      };
+    }
+
+    function updateBullets() {
+      for (let i = 0; i < bullets.length; i++) {
+        bullets[i].update();
+        bullets[i].draw();
+
+        if (bullets[i].y < 0) {
+          bulletExplosions.push(new BulletExplosion(bullets[i].x, bullets[i].y));
+          bullets.splice(i, 1);
+          i--;
+        }
+      }
+    }
+
+    function updateBulletExplosions() {
+      for (let i = 0; i < bulletExplosions.length; i++) {
+        bulletExplosions[i].update();
+        bulletExplosions[i].draw();
+      }
+    }
+
+    function updateEnemies() {
+      if (Math.random() < 0.02) {
+        enemies.push(new Enemy());
+      }
+
+      for (let i = 0; i < enemies.length; i++) {
+        enemies[i].update();
+        enemies[i].draw();
+      }
+    }
+
+    function checkCollisions() {
+      for (let i = 0; i < bullets.length; i++) {
+        for (let j = 0; j < enemies.length; j++) {
+          if (
+            bullets[i].x < enemies[j].x + enemies[j].width &&
+            bullets[i].x + bullets[i].width > enemies[j].x &&
+            bullets[i].y < enemies[j].y + enemies[j].height &&
+            bullets[i].y + bullets[i].height > enemies[j].y
+          ) {
+            // Trigger explosion animation for bullets
+            bulletExplosions.push(new BulletExplosion(enemies[j].x, enemies[j].y));
+
+            bullets.splice(i, 1);
+            i--;
+
+            enemies.splice(j, 1);
+            j--;
+          }
+        }
+      }
+
+      // Check collision with player
+      for (let i = 0; i < enemies.length; i++) {
+        if (
+          player.x < enemies[i].x + enemies[i].width &&
+          player.x + player.width > enemies[i].x &&
+          player.y < enemies[i].y + enemies[i].height &&
+          player.y + player.height > enemies[i].y
+        ) {
+          // Game over logic
+          gameOver();
+        }
+      }
+    }
+
+    function gameOver() {
+      clearInterval(gameInterval);
+      document.getElementById("startBtn").style.display = "inline";
+      document.getElementById("restartBtn").style.display = "none";
+      document.getElementById("game-title").innerText = "Game Over - Press Start to Play Again";
+
+      player = null;
+      enemies = [];
+      bullets = [];
+      bulletExplosions = [];
+    }
+
+    const explosions = [];
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft" && player.x > 0) {
+        player.x -= 5;
+      } else if (event.key === "ArrowRight" && player.x < canvas.width - player.width) {
+        player.x += 5;
+      }
+
+      // Memastikan hanya menanggapi tombol spasi jika fokus ada pada game canvas
+      if (event.key === "Space" && document.activeElement === canvas) {
+        bullets.push(new Bullet(player.x + player.width / 2 - 2.5, player.y));
+      }
+    });
+  </script>
+</body>
+</html>
